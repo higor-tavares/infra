@@ -9,6 +9,11 @@ def lambda_handler(event, context):
    sqs = boto3.client('sqs')
    sqs.send_message(
     QueueUrl = queue,
-    MessageBody = json.dumps(event)
+    MessageBody = json.dumps(event['body'])
    )
    print(f'Enqueued the message successfully')
+   response = {
+        'statusCode': 200,
+        'body': json.dumps('Enqueued')
+   }
+   return response
