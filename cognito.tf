@@ -12,14 +12,15 @@ resource "aws_cognito_user_pool_client" "app_client" {
     id_token      = "hours"
   }
   refresh_token_validity = 1
-  access_token_validity  = 60
-  id_token_validity      = 1
+  access_token_validity  = 300
+  id_token_validity      = 5
   generate_secret = true
   prevent_user_existence_errors = "ENABLED"
   enable_token_revocation = true
   allowed_oauth_flows = ["client_credentials"]
   allowed_oauth_flows_user_pool_client = true
   allowed_oauth_scopes = ["webhook/write"]
+  depends_on = [ aws_cognito_resource_server.resource ]
 }
 
 resource "aws_cognito_user_pool_domain" "main" {

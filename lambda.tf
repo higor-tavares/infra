@@ -8,7 +8,7 @@ module "lambda_function" {
   source_path        = "./lambda"
   attach_policy_json = true
   environment_variables = {
-    "QUEUE_URL" = "https://sqs.us-west-1.amazonaws.com/418272752891/pix_payment_queue"
+    "QUEUE_URL" = "https://sqs.${local.region}.amazonaws.com/${local.account}/pix_payment_queue"
   }
   policy_json = jsonencode({
     Version = "2012-10-17"
@@ -16,7 +16,7 @@ module "lambda_function" {
       {
         Effect   = "Allow"
         Action   = "sqs:SendMessage"
-        Resource = "arn:aws:sqs:us-west-1:418272752891:pix_payment_queue"
+        Resource = "arn:aws:sqs:${local.region}:${local.account}:pix_payment_queue"
       }
     ]
   })

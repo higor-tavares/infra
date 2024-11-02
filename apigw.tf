@@ -1,59 +1,45 @@
-resource "aws_api_gateway_rest_api" "api" {
-  name = "webhook_apigw"
+resource "aws_apigatewayv2_api" "api" {
+  name          = "webhook-api-gateway"
+  protocol_type = "HTTP"
 }
 
-resource "aws_api_gateway_resource" "apigw-resource" {
-    path_part = "webhook"
-    parent_id = aws_api_gateway_rest_api.api.root_resource_id
-    rest_api_id = aws_api_gateway_rest_api.api.id
+resource "aws_apigatewayv2_route" "lambda_route" {
+  api_id    = aws_apigatewayv2_api.api.id
+  route_key = "POST /webhook"
+  authorization_type = "JWT"
+  authorizer_id      = aws_apigatewayv2_authorizer.jwt_authorizer.id
+  target             = "integrations/${aws_apigatewayv2_integration.lambda_integration.id}"
 }
 
-resource "aws_api_gateway_method" "apigw-method" {
-  rest_api_id = aws_api_gateway_rest_api.api.id
-  resource_id = aws_api_gateway_resource.apigw-resource.id
-  http_method = "POST"
-  authorization = "COGNITO_USER_POOLS"
-  authorizer_id = aws_api_gateway_authorizer.auth.id
+resource "aws_apigatewayv2_integration" "lambda_integration" {
+  api_id           = aws_apigatewayv2_api.api.id
+  integration_type = "AWS_PROXY" 
+  integration_uri  = module.lambda_function.lambda_function_invoke_arn
+  payload_format_version = "2.0"
 }
 
-resource "aws_api_gateway_integration" "lambda_integration" {
-  rest_api_id = aws_api_gateway_rest_api.api.id
-  resource_id = aws_api_gateway_resource.apigw-resource.id
-  http_method = aws_api_gateway_method.apigw-method.http_method
-  integration_http_method = "POST"
-  type = "AWS_PROXY"
-  uri = module.lambda_function.lambda_function_invoke_arn
-}
-
-resource "aws_lambda_permission" "apigw_lambda" {
-  statement_id  = "AllowExecutionFromAPIGateway"
+resource "aws_lambda_permission" "api_gateway_permission" {
+  statement_id  = "AllowAPIGatewayInvoke"
   action        = "lambda:InvokeFunction"
   function_name = module.lambda_function.lambda_function_name
   principal     = "apigateway.amazonaws.com"
-  source_arn = "arn:aws:execute-api:us-west-1:418272752891:${aws_api_gateway_rest_api.api.id}/*/${aws_api_gateway_method.apigw-method.http_method}${aws_api_gateway_resource.apigw-resource.path}"
+  source_arn    = "${aws_apigatewayv2_api.api.execution_arn}/*"
 }
-resource "aws_api_gateway_deployment" "deployment" {
-  rest_api_id = aws_api_gateway_rest_api.api.id
 
-  triggers = {
-    redeployment = sha1(jsonencode(aws_api_gateway_rest_api.api.body))
+resource "aws_apigatewayv2_stage" "http_stage" {
+  api_id      = aws_apigatewayv2_api.api.id
+  name        = "sandbox"
+  auto_deploy = true
+}
+
+
+resource "aws_apigatewayv2_authorizer" "jwt_authorizer" {
+  api_id      = aws_apigatewayv2_api.api.id
+  name        = "authorizer"
+  authorizer_type = "JWT"
+  identity_sources = ["$request.header.Authorization"]
+  jwt_configuration {
+    issuer   = "https://cognito-idp.${local.region}.amazonaws.com/${aws_cognito_user_pool.pool.id}"
+    audience = ["${aws_cognito_user_pool_client.app_client.id}"]
   }
-
-  lifecycle {
-    create_before_destroy = true
-  }
-  depends_on = [ aws_api_gateway_method.apigw-method ]
-}
-
-resource "aws_api_gateway_stage" "development" {
-  deployment_id = aws_api_gateway_deployment.deployment.id
-  rest_api_id   = aws_api_gateway_rest_api.api.id
-  stage_name    = "development"
-}
-resource "aws_api_gateway_authorizer" "auth" {
-  name = "authgateway"
-  rest_api_id = aws_api_gateway_rest_api.api.id
-  type          = "COGNITO_USER_POOLS"
-  provider_arns = [aws_cognito_user_pool.pool.arn]
-  identity_source = "method.request.header.Authorization"
 }
