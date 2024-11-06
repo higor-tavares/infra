@@ -29,6 +29,11 @@ resource "aws_lambda_permission" "api_gateway_permission" {
 resource "aws_apigatewayv2_stage" "http_stage" {
   api_id      = aws_apigatewayv2_api.api.id
   name        = "sandbox"
+   access_log_settings {
+    destination_arn = aws_cloudwatch_log_group.api_gw_v2_log_group.arn
+    format  = "requestId [$context.requestId] time:[$context.requestTime] method:[$context.httpMethod] routeKey:[$context.routeKey] response_status: [$context.status]"
+  }
+
   auto_deploy = true
 }
 
